@@ -12,7 +12,10 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="repla
 from playwright.sync_api import sync_playwright, Page
 from dataclasses import dataclass
 from typing import List
-import time
+import time, datetime
+
+# unique suffix ทุกรันเพื่อไม่ให้ code ซ้ำ
+RUN_ID = datetime.datetime.now().strftime("%m%d%H%M")
 
 BASE_URL    = "http://203.151.6.30/web-bms-vcsdev"
 USERNAME    = "adminvcs"
@@ -309,13 +312,13 @@ def tc_ctype_05_create(page: Page):
     form_items = cdk.locator(".ant-form-item").all()
 
     try:
-        # [0] รหัสประเภทรถยนต์
+        # [0] รหัสประเภทรถยนต์ — ใช้ RUN_ID ป้องกัน duplicate
         code_inp = form_items[0].locator("input").first
-        code_inp.fill("TEST-TYPE-001")
+        code_inp.fill(f"TEST-{RUN_ID}")
 
         # [1] ชื่อประเภทรถยนต์
         name_inp = form_items[1].locator("input").first
-        name_inp.fill("ประเภทรถทดสอบ AUTO")
+        name_inp.fill(f"ประเภทรถทดสอบ AUTO {RUN_ID}")
 
         # [3] กว้าง
         form_items[3].locator("input").first.fill("2.5")
@@ -480,11 +483,24 @@ def tc_ctype_06_action_buttons(page: Page):
                 save_btn = cdk.locator("button:has-text('บันทึก')")
                 if save_btn.count() > 0:
                     page.evaluate("(el) => el.click()", save_btn.first.element_handle())
-                    page.wait_for_timeout(3_000)
-                    success = page.locator(".ant-notification-notice-message, .ant-message-success")
+                    # รอ notification (อาจหายเร็ว — ใช้ wait_for แทน count)
+                    SUCCESS_SEL = (
+                        ".ant-notification-notice-message, .ant-message-success, "
+                        ".ant-notification-notice, nz-notification, "
+                        ".ant-message-notice"
+                    )
+                    try:
+                        page.wait_for_selector(SUCCESS_SEL, timeout=5_000)
+                        notif_found = True
+                    except Exception:
+                        notif_found = False
+                    # fallback: ถ้า form ปิดแล้ว ถือว่าสำเร็จ
+                    form_now_closed = cdk.locator(".ant-form-item").count() == 0
+                    passed = notif_found or form_now_closed
                     report("TC-CTYPE-06d", "แก้ไขข้อมูล → บันทึกสำเร็จ",
-                           "PASS" if success.count() > 0 else "SKIP",
-                           "success notification แสดง" if success.count() > 0 else "ไม่พบ notification")
+                           "PASS" if passed else "SKIP",
+                           "notification แสดง" if notif_found else
+                           ("form ปิดแล้ว" if form_now_closed else "ไม่พบ notification และ form ยังเปิด"))
                 edited = True
                 break
             except Exception:

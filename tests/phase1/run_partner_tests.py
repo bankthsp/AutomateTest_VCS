@@ -282,15 +282,37 @@ def tc_partner_03_view_detail(page: Page):
     report("TC-PARTNER-03e", f"Fields มีข้อมูลแสดง ({filled_count} fields มีค่า)",
            "PASS" if filled_count > 0 else "FAIL")
 
-    # ตรวจว่า fields เป็น read-only / disabled
-    disabled_count = 0
+    # ตรวจว่า fields เป็น read-only — Angular ใช้ nzDisabled directive
+    # ซึ่งไม่ set HTML disabled attribute จึงต้องตรวจด้วย class หรือ JS
+    readonly_count = 0
     for item in form_items[:10]:
         inp = item.locator("input")
-        if inp.count() > 0 and inp.first.is_disabled():
-            disabled_count += 1
-    report("TC-PARTNER-03f", f"Fields เป็น Read-Only (disabled={disabled_count})",
-           "PASS" if disabled_count > 0 else "SKIP",
-           "ข้อมูลดูได้อย่างเดียว")
+        if inp.count() == 0:
+            continue
+        el = inp.first
+        # วิธี 1: HTML disabled attribute
+        if el.is_disabled():
+            readonly_count += 1
+            continue
+        # วิธี 2: class ant-input-disabled (Angular nzDisabled)
+        cls = el.get_attribute("class") or ""
+        if "ant-input-disabled" in cls:
+            readonly_count += 1
+            continue
+        # วิธี 3: ลอง type แล้วดูว่าค่าเปลี่ยนไหม (try-fill)
+        try:
+            original = el.input_value()
+            el.fill("__readonly_test__", timeout=1_000)
+            after = el.input_value()
+            if after == original:      # ไม่ยอมรับ input
+                readonly_count += 1
+            else:                      # ยอมรับ — undo
+                el.fill(original)
+        except Exception:
+            readonly_count += 1        # timeout = ไม่ editable
+    report("TC-PARTNER-03f", f"Fields เป็น Read-Only ({readonly_count}/10 fields)",
+           "PASS" if readonly_count > 0 else "FAIL",
+           "Angular nzDisabled — ตรวจผ่าน class + try-fill")
 
     # ตรวจปุ่มใน Modal
     form_btns = cdk.locator("button").all_inner_texts()
