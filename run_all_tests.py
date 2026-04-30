@@ -34,13 +34,12 @@ MODULES = [
         "name":  "ข้อมูลคู่ค้า (Partners)",
         "path":  "tests/phase1/run_partner_tests.py",
     },
-    # --- เพิ่มโมดูลใหม่ที่นี่เมื่อพร้อม ---
-    # {
-    #     "phase": 1,
-    #     "id":    "drivers",
-    #     "name":  "พนักงานขับรถ (Drivers)",
-    #     "path":  "tests/phase1/run_driver_tests.py",
-    # },
+    {
+        "phase": 1,
+        "id":    "drivers",
+        "name":  "พนักงานขับรถ (Drivers)",
+        "path":  "tests/phase1/run_driver_tests.py",
+    },
     # {
     #     "phase": 1,
     #     "id":    "postoffices",
@@ -148,12 +147,30 @@ def main():
     print(f"  จำนวน modules: {len(modules)}")
     print("=" * 60)
 
+    # pre-warm: ping server ก่อนเริ่ม เพื่อ warm-up connection
+    print("\n  [pre-warm: ตรวจสอบ server ก่อนเริ่มรัน...]")
+    import urllib.request, urllib.error
+    for _ in range(5):
+        try:
+            urllib.request.urlopen(
+                "http://203.151.6.30/web-bms-vcsdev/login", timeout=10
+            )
+            print("  [pre-warm: server ตอบสนองแล้ว ✓]")
+            break
+        except Exception:
+            print("  [pre-warm: รอ server... retry]")
+            time.sleep(5)
+
     total_start = time.time()
     all_results = []
 
-    for module in modules:
+    for i, module in enumerate(modules):
         result = run_module(module, show_output=not args.quiet)
         all_results.append(result)
+        # cooldown ระหว่าง module — ให้ browser ปิดและ server พัก
+        if i < len(modules) - 1:
+            print(f"\n  [cooldown 8 วินาที ก่อน module ถัดไป...]")
+            time.sleep(8)
 
     # ---------------------------------------------------------------------------
     # สรุปผลรวมทุก Module

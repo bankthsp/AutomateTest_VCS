@@ -145,23 +145,26 @@ def close_drawer(page: Page):
 
 def login(page: Page) -> bool:
     print("\n[LOGIN] กำลัง Login...")
-    try:
-        page.goto(f"{BASE_URL}/login", timeout=60_000)
-        page.wait_for_load_state("networkidle", timeout=30_000)
-        page.fill("#username", USERNAME)
-        page.fill("#password", PASSWORD)
-        page.locator("button.login-form-button").first.click()
-        page.wait_for_load_state("networkidle", timeout=30_000)
-        page.wait_for_timeout(2_000)
+    for attempt in range(1, 4):  # retry สูงสุด 3 ครั้ง
+        try:
+            page.goto(f"{BASE_URL}/login", timeout=60_000)
+            page.wait_for_load_state("networkidle", timeout=30_000)
+            page.wait_for_timeout(1_000)
+            page.fill("input[type='text']", USERNAME)
+            page.fill("input[type='password']", PASSWORD)
+            page.locator("button.login-form-button").first.click()
+            page.wait_for_load_state("networkidle", timeout=30_000)
+            page.wait_for_timeout(2_000)
 
-        if "login" in page.url:
-            print(f"  ✗ Login ล้มเหลว — URL: {page.url}")
-            return False
-        print(f"  ✓ Login สำเร็จ — URL: {page.url}")
-        return True
-    except Exception as e:
-        print(f"  ✗ Login Error: {e}")
-        return False
+            if "login" not in page.url:
+                print(f"  ✓ Login สำเร็จ (attempt {attempt}) — URL: {page.url}")
+                return True
+            print(f"  ✗ Login attempt {attempt} ล้มเหลว — URL: {page.url}")
+            page.wait_for_timeout(2_000)
+        except Exception as e:
+            print(f"  ✗ Login attempt {attempt} Error: {e}")
+            page.wait_for_timeout(2_000)
+    return False
 
 # ---------------------------------------------------------------------------
 # Test Cases

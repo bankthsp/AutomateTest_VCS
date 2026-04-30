@@ -109,22 +109,25 @@ def assert_on_cartype_page(page: Page):
 
 def login(page: Page) -> bool:
     print("\n[LOGIN] กำลัง Login...")
-    try:
-        page.goto(f"{BASE_URL}/login", timeout=60_000)
-        page.wait_for_load_state("networkidle", timeout=30_000)
-        page.fill("#username", USERNAME)
-        page.fill("#password", PASSWORD)
-        page.locator("button.login-form-button").first.click()
-        page.wait_for_load_state("networkidle", timeout=30_000)
-        page.wait_for_timeout(2_000)
-        if "login" in page.url:
-            print(f"  ✗ Login ล้มเหลว")
-            return False
-        print(f"  ✓ Login สำเร็จ — URL: {page.url}")
-        return True
-    except Exception as e:
-        print(f"  ✗ Error: {e}")
-        return False
+    for attempt in range(1, 4):
+        try:
+            page.goto(f"{BASE_URL}/login", timeout=60_000)
+            page.wait_for_load_state("networkidle", timeout=30_000)
+            page.wait_for_timeout(1_500)
+            page.fill("input[type='text']", USERNAME)
+            page.fill("input[type='password']", PASSWORD)
+            page.locator("button.login-form-button").first.click()
+            page.wait_for_load_state("networkidle", timeout=30_000)
+            page.wait_for_timeout(2_000)
+            if "login" not in page.url:
+                print(f"  ✓ Login สำเร็จ (attempt {attempt}) — URL: {page.url}")
+                return True
+            print(f"  ✗ Login attempt {attempt} ล้มเหลว")
+            page.wait_for_timeout(2_000)
+        except Exception as e:
+            print(f"  ✗ Login attempt {attempt} Error: {e}")
+            page.wait_for_timeout(2_000)
+    return False
 
 # ---------------------------------------------------------------------------
 # TC-CTYPE-01 : Read — ตรวจสอบหน้าแสดงรายการ

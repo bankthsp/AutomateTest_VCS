@@ -12,7 +12,9 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="repla
 from playwright.sync_api import sync_playwright, Page
 from dataclasses import dataclass
 from typing import List
-import time
+import time, datetime
+
+RUN_ID = datetime.datetime.now().strftime("%m%d%H%M")
 
 BASE_URL   = "http://203.151.6.30/web-bms-vcsdev"
 USERNAME   = "adminvcs"
@@ -118,22 +120,25 @@ def select_first_option(page: Page, select_locator):
 
 def login(page: Page) -> bool:
     print("\n[LOGIN] กำลัง Login...")
-    try:
-        page.goto(f"{BASE_URL}/login", timeout=60_000)
-        page.wait_for_load_state("networkidle", timeout=30_000)
-        page.fill("input[type='text']", USERNAME)
-        page.fill("input[type='password']", PASSWORD)
-        page.locator("button.login-form-button").first.click()
-        page.wait_for_load_state("networkidle", timeout=30_000)
-        page.wait_for_timeout(2_000)
-        if "login" in page.url:
-            print("  ✗ Login ล้มเหลว")
-            return False
-        print(f"  ✓ Login สำเร็จ — URL: {page.url}")
-        return True
-    except Exception as e:
-        print(f"  ✗ Error: {e}")
-        return False
+    for attempt in range(1, 4):
+        try:
+            page.goto(f"{BASE_URL}/login", timeout=60_000)
+            page.wait_for_load_state("networkidle", timeout=30_000)
+            page.wait_for_timeout(1_500)
+            page.fill("input[type='text']", USERNAME)
+            page.fill("input[type='password']", PASSWORD)
+            page.locator("button.login-form-button").first.click()
+            page.wait_for_load_state("networkidle", timeout=30_000)
+            page.wait_for_timeout(2_000)
+            if "login" not in page.url:
+                print(f"  ✓ Login สำเร็จ (attempt {attempt}) — URL: {page.url}")
+                return True
+            print(f"  ✗ Login attempt {attempt} ล้มเหลว")
+            page.wait_for_timeout(2_000)
+        except Exception as e:
+            print(f"  ✗ Login attempt {attempt} Error: {e}")
+            page.wait_for_timeout(2_000)
+    return False
 
 # ---------------------------------------------------------------------------
 # TC-DRIVER-01 : Read — ตรวจสอบหน้าแสดงรายการ
@@ -354,8 +359,8 @@ def tc_driver_05_create(page: Page):
         if sel4.count() > 0:
             select_first_option(page, sel4)
 
-        # [6] ชื่อเต็ม★
-        form_items[6].locator("input").first.fill("ทดสอบ")
+        # [6] ชื่อเต็ม★ — ใช้ RUN_ID ป้องกัน duplicate
+        form_items[6].locator("input").first.fill(f"ทดสอบ{RUN_ID}")
 
         # [7] นามสกุล★
         form_items[7].locator("input").first.fill("ออโต้ TEST")
@@ -421,7 +426,7 @@ def tc_driver_05_create(page: Page):
 
     # ค้นหาข้อมูลที่สร้าง
     nav_to_driver(page)
-    page.locator("input.ant-input").first.fill("ทดสอบ")
+    page.locator("input.ant-input").first.fill(f"ทดสอบ{RUN_ID}")
     page.locator("button:has-text('ค้นหา')").first.click()
     page.wait_for_load_state("networkidle", timeout=15_000)
     page.wait_for_timeout(1_500)
